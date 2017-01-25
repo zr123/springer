@@ -15,7 +15,7 @@ enum knightMoveDirection{
   upLeft
 };
 
-// forward deklaration damit sich field selbst referenzieren kann
+// forward declaration damit sich field selbst referenzieren kann
 typedef struct field field;
 // Feld aus dem das Schachbrett besteht
 struct field{
@@ -60,11 +60,11 @@ typedef struct board{
 
 int handleCommandLineArguments(parameters* param, int argc, char* argv[]);
 void initParameters(parameters* param);
-void loadParameterIni(parameters* param, const char* filename);
+int loadParameterIni(parameters* param, const char* filename);
 int parseArgument(parameters* param, const char* argument);
 int convertLetterToPosition(char letter);
 
-void printBoardToCSVFile(board* boardPointer, const char* filename);
+int printBoardToCSVFile(board* boardPointer, const char* filename);
 field* getFieldPointer(board* boardPointer, int x, int y);
 
 int initBoard(board* boardPointer, parameters* param);
