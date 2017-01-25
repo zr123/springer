@@ -82,15 +82,11 @@ int parseArgument(parameters* param, const char* argument){
     param->dynamicOutput = 1;
     return 0;
   }
-  int customWidth;
-  if(sscanf(argument, "-w=%d", &customWidth) == 1 || sscanf(argument, "-width=%d", &customWidth) == 1){
-    param->boardWidth = customWidth;
+  if(sscanf(argument, "-w=%d", &param->boardWidth) == 1 || sscanf(argument, "-width=%d", &param->boardWidth) == 1)
     return 0;
-  }
-  int customHeight;
   if(sscanf(argument, "-h=%d", &param->boardHeight) == 1 || sscanf(argument, "-height=%d", &param->boardHeight) == 1)
     return 0;
-  if(sscanf(argument, "-csv=%s", &param->CSVfilename))
+  if(sscanf(argument, "-csv=%s", param->CSVfilename))
     return 0;
   if(sscanf(argument, "-p=%d", &param->permutation) == 1)
     return 0;
@@ -203,7 +199,7 @@ int initBoard(board* boardPointer, parameters* param){
   // Alles initieren
   boardPointer->height = param->boardHeight;
   boardPointer->width = param->boardWidth;
-  boardPointer->fields = (field*)malloc(sizeof(field)*boardPointer->height*boardPointer->width);
+  boardPointer->fields = (field*)calloc(boardPointer->height*boardPointer->width, sizeof(field));
   if(boardPointer->fields == NULL)
     return 1;
   boardPointer->endingField = NULL;
