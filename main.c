@@ -12,17 +12,20 @@
   - Windows/Linux Problematik
   - braucht field wirklich sein x und y?
   - -s|seperator
-  - bei -d bleibt das letzte Feld leer
 */
 int main(int argc, char* argv[]){
   parameters p;
   board b;
 
-  if(handleCommandLineArguments(&p, argc, argv))
+  if(handleCommandLineArguments(&p, argc, argv)){
+    printf("Fehlende Eingabeparameter. Hilfe mit --help\n");
     return 1;
-  if(initBoard(&b, &p))
+  }
+  if(initBoard(&b, &p)){
+    printf("Initialisierungsfehler. Programmausführung abgebrochen.");
     return 1;
-  // Buggy, fix
+  }
+  // Buggy, fix => analysiert position noch nicht korrekt
   //if(!checkBounds(&b, p.startingPos_x, p.startingPos_y))
   //  return 1;
   
