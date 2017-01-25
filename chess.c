@@ -23,7 +23,7 @@ int handleCommandLineArguments(parameters* param, int argc, char* argv[]){
   initParameters(param);
   loadParameterIni(param, "init.ini");
   if(argc == 1)
-    printf("Fehlende Eingabeparameter. Hilfe mit --help\n");
+    return 1;
   for(int i = 1; i < argc; ++i){
     if(!strncmp(argv[i], "-", 1)){
       parseArgument(param, argv[i]);
@@ -48,25 +48,19 @@ void initParameters(parameters* param){
   param->loop = 0;
   param->dynamicOutput = 0;
   param->permutation = 0;
-  // inifile?
 }
 
-void loadParameterIni(parameters* param, const char* filename){
+int loadParameterIni(parameters* param, const char* filename){
   FILE* handle = fopen(filename, "r");
-  int intbuffer;
-  fscanf(handle, "loop=%d\n", &intbuffer);
-  param->loop = intbuffer;
-  fscanf(handle, "height=%d\n", &intbuffer);
-  param->boardHeight = intbuffer;
-  fscanf(handle, "width=%d\n", &intbuffer);
-  param->boardWidth = intbuffer;
-  fscanf(handle, "dynamic=%d\n", &intbuffer);
-  param->dynamicOutput = intbuffer;
-  char filenameBuffer[256] = "";
-  fscanf(handle, "csv=\"%[^\"]s\"\n", filenameBuffer);
-  strcpy(param->CSVfilename, filenameBuffer);
-  fscanf(handle, "permutation=%d\n", &intbuffer);
-  param->permutation = intbuffer;
+  if(handle == NULL)return 1;
+  fscanf(handle, "loop=%d\n", &param->loop);
+  fscanf(handle, "height=%d\n", &param->boardHeight);
+  fscanf(handle, "width=%d\n", &param->boardWidth);
+  fscanf(handle, "dynamic=%d\n", &param->dynamicOutput);
+  fscanf(handle, "csv=\"%[^\"]s\"\n", param->CSVfilename);
+  fscanf(handle, "permutation=%d\n", &param->permutation);
+  fclose(handle);
+  return 0;
 }
 
 int parseArgument(parameters* param, const char* argument){
@@ -138,9 +132,10 @@ void resetFieldValue(field* fieldPointer){
   }
 }
 
-void printBoardToCSVFile(board* boardPointer, const char* filename){
-  if(filename == NULL || strlen(filename) == 0)return;
+int printBoardToCSVFile(board* boardPointer, const char* filename){
+  if(filename == NULL || strlen(filename) == 0)return 0;
   FILE* handle = fopen(filename, "w");
+  if(handle == NULL)return 1;
   for(int y = boardPointer->height-1; y >= 0; --y){
     fprintf(handle, "%d", getFieldPointer(boardPointer, 0, y)->value); 
     for(int x = 1; x < boardPointer->width; ++x){
@@ -148,6 +143,8 @@ void printBoardToCSVFile(board* boardPointer, const char* filename){
     }
     fprintf(handle, "\n");
   }
+  fclose(handle);
+  return 0;
 }
 
 int checkBounds(board* boardPointer, int pos_x, int pos_y){
@@ -159,6 +156,7 @@ int checkBounds(board* boardPointer, int pos_x, int pos_y){
 field* knightMove(board* boardPointer, int pos_x, int pos_y, int direction){
   // Bitte einen Moment inne halten und bewundern wie elegant ich das hier gelöst habe.
   // from 0 to 7 clockwise, starting with "upRight" (2 Up, 1 Right)
+  if(direction < 0 || direction > 7)return NULL; 
   int x = 1, y = 2;
   if((direction+1) & 2)x = 2, y = 1;
   if((direction+2) & 4)y *= -1;
@@ -303,15 +301,6 @@ void updateOutputString(board* boardPointer){
     }
 }
 
-
-
-/*
-Optimisierung:
-  Bei der Wahl der Route:
-    - (wenn ein ziel eine möglichkeit hat und Count != 35 -> suicide)
-    - wenn ein ziel 2 möglichkeiten hat -> anspringen und restliche möglichkeiten killen
-    - wenn zwei oder mehr ziele nur 2 möglichkeiten haben -> suicide
-*/
 int solve(board* boardPointer, field* currentField, int count){
   // Aufgabe C: Abbrechen wenn das Endefeld gesetzt ist
   if(boardPointer->endingField != NULL && boardPointer->endingField->remainingAccessibleFieldCount == 0)
@@ -322,6 +311,11 @@ int solve(board* boardPointer, field* currentField, int count){
       boardPointer->permutationCount--;
       return 0;
     }else{
+      if(boardPointer->dynamicOutput){
+        setOutputFieldByValue(boardPointer, currentField->x, currentField->y+1, count);
+        SetConsoleCursorPosition(boardPointer->consoleHandle, boardPointer->bufferInfo.dwCursorPosition);
+        printf("%s", boardPointer->outputString);
+      }
       setFieldValue(currentField, count);
       return 1;
     }
