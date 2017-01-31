@@ -15,19 +15,23 @@ enum knightMoveDirection{
   upLeft
 };
 
+typedef struct coord{
+  int x;
+  int y;
+} coord;
+
 // forward declaration damit sich field selbst referenzieren kann
 typedef struct field field;
 // Feld aus dem das Schachbrett besteht
 struct field{
-  int x;                              // x-Position des Feldes
-  int y;                              // y-Position des Feldes
+  char* outputFieldLocation;          // Position im Outputstring, an dem das Feld positioniert ist
   int value;                          // Wert; Als wievieltes Feld es angesprungen wurde
   int remainingAccessibleFieldCount;  // Zählvariable für die übrigen, anspringbaren Felder
   int accessibleFieldCount;           // Gesamtanzahl der anspringbaren Felder. =8 außer für Rand- und Eckfelder
   field* accessibleFields[8];         // Pointer zu den anspringbaren Feldern.
 };
 
-// In dieser struktur werden die Parameter aus der Kommandozeile gesammelt
+// In dieser Struktur werden die Parameter aus Ini-File/Kommandozeile gesammelt
 typedef struct parameters{
   char CSVfilename[256];  // Name des Ausgabe-CSV Files
   int boardWidth;         // Feldbreiteparameter
@@ -59,7 +63,7 @@ typedef struct board{
 } board;
 
 int handleCommandLineArguments(parameters* param, int argc, char* argv[]);
-void initParameters(parameters* param);
+parameters* initParameters();
 int loadParameterIni(parameters* param, const char* filename);
 int parseArgument(parameters* param, const char* argument);
 int convertLetterToPosition(char letter);
@@ -70,8 +74,8 @@ field* getFieldPointer(board* boardPointer, int x, int y);
 int initBoard(board* boardPointer, parameters* param);
 void initField(board* boardPointer, int pos_x, int pos_y);
 void linkFields(board* boardPointer, int x, int y);
-field* knightMove(board* boardPointer, int pos_x, int pos_y, int direction);
-int checkBounds(board* boardPointer, int pos_x, int pos_y);
+coord knightMove(coord coordinate, int direction);
+int checkBounds(board* boardPointer, coord position);
 
 int initOutputField(board* boardPointer);
 int countDigits(int number);
@@ -82,6 +86,8 @@ void setOutputFieldByValue(board* out, int x, int y, int value);
 
 int solve(board* boardPointer, field* currentField, int count);
 void setFieldValue(field* fieldPointer, int value);
+void resetFieldValue(field* fieldPointer);
+void adjustNextAccessibleFieldsCount(field* fieldPointer, int adjustmentAmount);
 int checkDeadEnd(board* boardPointer);
 int compareFieldValues(const void* a, const void* b);
 
