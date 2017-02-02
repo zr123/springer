@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #if defined(_WIN32) || defined(__CYGWIN__)
 #include <windows.h>
 #endif
@@ -18,7 +19,8 @@ Options:\n\
   -csv=<Filename>       Brett nach Berechnung als CSV nach Filename schreiben\n\
   -p=<n>                Ermittelt die n'te Permutation\n\
   ";
-  
+
+// wertet die Optionen/Argumente aus der Kommandozeile aus  
 int handleCommandLineArguments(parameters* param, int argc, char* argv[]){
   if(param == NULL || argc == 1){
     printf("Fehlende Eingabeparameter. Hilfe mit --help\n");
@@ -27,21 +29,23 @@ int handleCommandLineArguments(parameters* param, int argc, char* argv[]){
   for(int i = 1; i < argc; ++i)
     if(parseArgument(param, argv[i]))
       return 1;
+  // sanitize coordinate
+  param->startingPos.y = param->boardHeight - param->startingPos.y;
+  // end
   return 0;
 }
 
+// initiert Parameter-struct
 parameters* initParameters(){
-  parameters* param = (parameters*)calloc(sizeof(parameters), 1);
+  parameters* param = (parameters*)calloc(1, sizeof(parameters));
   if(param == NULL)
     return NULL;
   param->boardWidth = 8;
   param->boardHeight = 8;
-  //param->startingPos_x = -1;
-  //param->startingPos_y = -1;
-  loadParameterIni(param, "init.ini");
   return param;
 }
 
+// Lädt parameter
 int loadParameterIni(parameters* param, const char* filename){
   FILE* handle = fopen(filename, "r");
   if(handle == NULL)return 1;
@@ -51,10 +55,12 @@ int loadParameterIni(parameters* param, const char* filename){
   fscanf(handle, "dynamic=%d\n", &param->dynamicOutput);
   fscanf(handle, "csv=\"%[^\"]s\"\n", param->CSVfilename);
   fscanf(handle, "permutation=%d\n", &param->permutation);
+  fscanf(handle, "autorandom=%d\n", &param->permutation);
   fclose(handle);
   return 0;
 }
 
+// WIP: cleanup needed!!!
 int parseArgument(parameters* param, const char* argument){
   if(!strncmp(argument, "-", 1)){
     if(!strcmp(argument, "-help") || !strcmp(argument, "--help") || !strcmp(argument, "-h") || !strcmp(argument, "--h")){
@@ -81,8 +87,8 @@ int parseArgument(parameters* param, const char* argument){
     return 1;
   }else{
     char posLetter;
-    if(sscanf(argument, "%c%d", &posLetter, &param->startingPos_y) == 2){
-      param->startingPos_x = convertLetterToPosition(posLetter);
+    if(sscanf(argument, "%c%d", &posLetter, &param->startingPos.y) == 2){
+      param->startingPos.x = convertLetterToPosition(posLetter);
       return 0;
     }else{
       printf("Ung\x81ltige Eingabe: %s\n", argument);
@@ -93,9 +99,18 @@ int parseArgument(parameters* param, const char* argument){
 
 // den Buchstabenteil aus "A6" oder "f1" zu dem integer-Positionswert konvertieren
 int convertLetterToPosition(char letter){
-  int pos_x = letter - 97;
-  if(pos_x < 0)pos_x = letter - 65;
+  int pos_x = letter - 'a';
+  if(pos_x < 0)pos_x = letter - 'A';
   return pos_x;
+}
+
+// generiert eine zufällige Koordinate, innerhalb der gegebenen Grenzen
+coord getRandomCoord(int max_x, int max_y){
+  srand(time(NULL));
+  coord randomPosition;
+  randomPosition.x = rand() % max_x;
+  randomPosition.y = rand() % max_y;
+  return randomPosition;
 }
 
 // Prüfung ob ein Feld isoliert (nicht mehr anspringbar) ist
@@ -106,7 +121,7 @@ int checkFieldIsolation(board* boardPointer){
   return 0;
 }
 
-// Es dürfen maximal 2 Felder nur noch eine Sprungoption haben (derzeitiges Feld und schließliches Endfeld) 
+// WIP: Es dürfen maximal 2 Felder nur noch eine Sprungoption haben (derzeitiges Feld und schließliches Endfeld) 
 int checkDeadEnd(board* boardPointer){
   // eigentlich dürfen nur currentfield und endingfield remainingAccessibleFieldCount==1 haben
   int count = 0;
@@ -117,8 +132,8 @@ int checkDeadEnd(board* boardPointer){
 }
 
 // Feldpointer aus Koordinaten ermitteln
-field* getFieldPointer(board* boardPointer, int x, int y){
-  return &boardPointer->fields[boardPointer->width*y + x];  
+field* getFieldPointer(board* boardPointer, coord position){
+  return &boardPointer->fields[boardPointer->width*position.y + position.x];  
 }
 
 // Sprungmarkierung setzten und Anzahl der Anspringbaren Felder reduzieren
@@ -176,13 +191,13 @@ coord knightMove(coord position, int direction){
   return position;
 }
 
-void linkFields(board* boardPointer, int x, int y){
-  field* fieldPointer = getFieldPointer(boardPointer, x, y);
+void linkFields(board* boardPointer, coord position){
+  field* fieldPointer = getFieldPointer(boardPointer, position);
   int count = 0;
   for(int direction = 0; direction < 8; ++direction){
-    coord coordinate = knightMove((coord){x, y}, direction);
-    if(checkBounds(boardPointer, coordinate)){
-      fieldPointer->accessibleFields[count] = getFieldPointer(boardPointer, coordinate.x, coordinate.y);;
+    coord nextStep = knightMove(position, direction);
+    if(checkBounds(boardPointer, nextStep)){
+      fieldPointer->accessibleFields[count] = getFieldPointer(boardPointer, nextStep);
       count++;
     }
   }
@@ -190,42 +205,66 @@ void linkFields(board* boardPointer, int x, int y){
   fieldPointer->remainingAccessibleFieldCount = count;
 }
 
-void initField(board* boardPointer, int pos_x, int pos_y){
-  field* fieldPointer = getFieldPointer(boardPointer, pos_x, pos_y);
-  fieldPointer->outputFieldLocation = boardPointer->outputString + boardPointer->outputWidth*(2*pos_y +2) + (boardPointer->fieldSize+1)*pos_x + 1;
-  linkFields(boardPointer, pos_x, pos_y);
+void initField(board* boardPointer, coord position){
+  field* fieldPointer = getFieldPointer(boardPointer, position);
+  fieldPointer->outputFieldLocation = 
+    boardPointer->outputString + boardPointer->outputWidth*(2*position.y +2) + (boardPointer->fieldSize+1)*position.x + 1;
+  #if defined(_WIN32) || defined(__CYGWIN__)
+  fieldPointer->consoleFieldPosition = boardPointer->bufferInfo.dwCursorPosition;
+  fieldPointer->consoleFieldPosition.Y += 2*position.y+2;
+  fieldPointer->consoleFieldPosition.X += (boardPointer->fieldSize+1)*position.x +1;
+  #endif
+  
 }
 
-int initBoard(board* boardPointer, parameters* param){
-  // Alles initieren
+void initAllFields(board* boardPointer){
+  // link all fields accessible by a knights move to each other
+  for(int x = 0; x < boardPointer->width; ++x)
+    for(int y = 0; y < boardPointer->height; ++y){
+      linkFields(boardPointer, (coord){x, y});
+      initField(boardPointer, (coord){x, y});
+    }
+}
+
+// transferiert Parameter zum Brett
+void transferParameters(board* boardPointer, parameters* param){
   boardPointer->height = param->boardHeight;
   boardPointer->width = param->boardWidth;
-  boardPointer->fields = (field*)calloc(boardPointer->height*boardPointer->width, sizeof(field));
-  if(boardPointer->fields == NULL)
-    return 1;
-  boardPointer->endingField = NULL;
   boardPointer->dynamicOutput = param->dynamicOutput;
   boardPointer->permutationCount = param->permutation;
-  // schön machen start
+  boardPointer->disableOutput = param->disableOutput;
+}
+
+void determineEndingField(board* boardPointer, parameters* param){
   if(param->loop)
-    boardPointer->endingField = getFieldPointer(boardPointer, param->startingPos_x, boardPointer->height - param->startingPos_y);
-  // schön machen end
-  if(boardPointer->dynamicOutput){
+    boardPointer->endingField = getFieldPointer(boardPointer, param->startingPos);
+}
+
+board* initBoard(parameters* param){
+  board* boardPointer = calloc(1, sizeof(board));
+  if(boardPointer == NULL)
+    return NULL;
+  transferParameters(boardPointer, param);
+  boardPointer->fields = (field*)calloc(boardPointer->height*boardPointer->width, sizeof(field));
+  if(boardPointer->fields == NULL)
+    return NULL;
+  determineEndingField(boardPointer, param);
+
+  
+  if(!boardPointer->disableOutput && boardPointer->dynamicOutput){
     #if defined(_WIN32) || defined(__CYGWIN__)
     boardPointer->consoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
     GetConsoleScreenBufferInfo(boardPointer->consoleHandle, &boardPointer->bufferInfo);
     #endif
   }
   if(initOutputField(boardPointer))
-    return 1;
+    return NULL;
   drawOutputField(boardPointer);
-  // link all fields accessible by a knights move to each other
-  for(int x = 0; x < boardPointer->width; ++x)
-    for(int y = 0; y < boardPointer->height; ++y)
-      initField(boardPointer, x, y);
-  return 0;
+  initAllFields(boardPointer);
+  return boardPointer;
 }
 
+// Ermittelt die Anzahl der Ziffern die benötigt werden um einen positiven Integer darzustellen
 int countDigits(int number){
   if(number == 0)
     return 0;
@@ -264,7 +303,7 @@ int initOutputField(board* boardPointer){
   boardPointer->outputHeight = (boardPointer->height + 1) *2;
   boardPointer->outputWidth = (boardPointer->width + 2) * (boardPointer->fieldSize + 1);
   boardPointer->requiredMemory = boardPointer->outputHeight * boardPointer->outputWidth;
-  boardPointer->outputString = malloc(sizeof(char)*boardPointer->requiredMemory);
+  boardPointer->outputString = (char*)malloc(sizeof(char)*boardPointer->requiredMemory);
   if(boardPointer->outputString == NULL)
     return 1;
   for(int y = 0; y < boardPointer->outputHeight; ++y){
@@ -283,6 +322,14 @@ void updateOutputField(board* boardPointer, field* fieldPointer){
   else
     sprintf(buffer, "%*c", boardPointer->fieldSize, ' ');
   strncpy(fieldPointer->outputFieldLocation, buffer, boardPointer->fieldSize);
+  #if defined(_WIN32) || defined(__CYGWIN__)
+  if(boardPointer->dynamicOutput){
+    SetConsoleCursorPosition(boardPointer->consoleHandle, fieldPointer->consoleFieldPosition);
+    printf("%s", buffer);
+    if(boardPointer->dynamicOutput > 1)
+      Sleep(boardPointer->dynamicOutput);
+  }
+  #endif
 }
 
 void setOutputFieldByValue(board* boardPointer, int x, int y, int value){
@@ -308,6 +355,10 @@ int compareFieldValues(const void* a, const void* b){
   return 0;
 }
 
+void doHeuristics(field* fieldPointer){
+  qsort(fieldPointer->accessibleFields, fieldPointer->accessibleFieldCount, sizeof(field*), compareFieldValues); 
+}
+
 void updateOutputString(board* boardPointer){
   for(int i = 0; i < boardPointer->height*boardPointer->width; ++i)
     updateOutputField(boardPointer, &boardPointer->fields[i]);
@@ -324,11 +375,8 @@ int solve(board* boardPointer, field* currentField, int count){
       return 0;
     }else{
       setFieldValue(currentField, count);
-      if(boardPointer->dynamicOutput){
+      if(boardPointer->dynamicOutput)
         updateOutputField(boardPointer, currentField);
-        SetConsoleCursorPosition(boardPointer->consoleHandle, boardPointer->bufferInfo.dwCursorPosition);
-        printf("%s", boardPointer->outputString);
-      }
       return 1;
     }
   //check if any field has been set to 0, or multiple have been set to 1
@@ -336,21 +384,13 @@ int solve(board* boardPointer, field* currentField, int count){
     return 0;
   // set field and next recursion level 
   setFieldValue(currentField, count);
-  
-  if(boardPointer->dynamicOutput){
+  if(boardPointer->dynamicOutput)
     updateOutputField(boardPointer, currentField);
-    SetConsoleCursorPosition(boardPointer->consoleHandle, boardPointer->bufferInfo.dwCursorPosition);
-    printf("%s", boardPointer->outputString);
-  }
-  qsort(currentField->accessibleFields, currentField->accessibleFieldCount, sizeof(field*), compareFieldValues);
+  doHeuristics(currentField);
   for(int direction = 0; direction < currentField->accessibleFieldCount; ++direction)
-    if(currentField->accessibleFields[direction]->value == 0){
+    if(currentField->accessibleFields[direction]->value == 0)
       if(solve(boardPointer, currentField->accessibleFields[direction], count+1))
         return 1;
-      // unnötig
-      //if(currentField->accessibleFields[direction]->value == 2)
-      //  break;
-    }
   // recursion bad end -> reset field
   resetFieldValue(currentField);
   if(boardPointer->dynamicOutput)
