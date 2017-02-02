@@ -13,27 +13,34 @@
   - -e|end=
 */
 int main(int argc, char* argv[]){
+  // WIP: parameter struct kann eigentlich weg
   parameters* p = initParameters();
+  if(loadParameterIni(p, "parameter.ini"))
+    printf("Warnung: parameter.ini konnte nicht korrekt geladen werden.\n");
+  // WIP
   if(handleCommandLineArguments(p, argc, argv))
     return 1;
-  board b;
-  if(initBoard(&b, p)){
+  //p->startingPos = getRandomCoord(p->boardWidth, p->boardHeight);
+  board* b = initBoard(p);
+  if(b == NULL){
     printf("Initialisierungsfehler. Programmausführung abgebrochen.");
     return 1;
   }
-  if(!checkBounds(&b, (coord){p->startingPos_x, p->startingPos_y-1})){
-    printf("Ung\x81ltige Anfangsposition.\n", p->startingPos_x, p->startingPos_y);
+  if(!checkBounds(b, p->startingPos)){
+    printf("Ung\x81ltige Anfangsposition.\n");
     return 1;
   }
   
+  if(p->dynamicOutput)
+    printf(b->outputString);
   int timer = clock();
-  solve(&b, getFieldPointer(&b, p->startingPos_x, b.height - p->startingPos_y), 1);
+  solve(b, getFieldPointer(b, p->startingPos), 1);
   timer = clock()-timer;
   if(strlen(p->CSVfilename) > 0)
-    printBoardToCSVFile(&b, p->CSVfilename); 
-  updateOutputString(&b);
+    printBoardToCSVFile(b, p->CSVfilename); 
+  updateOutputString(b);
   if(!p->dynamicOutput)
-    printf(b.outputString);
+    printf(b->outputString);
   printf("\nDone in %d ms.\n", timer);
   return 0;
 }
