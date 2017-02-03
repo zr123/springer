@@ -66,7 +66,7 @@ typedef struct board{
   char* outputString;     // Ausgabestring
   int dynamicOutput;      // Flag für dynamische Ausgabe
   #if defined(_WIN32) || defined(__CYGWIN__)
-  HANDLE consoleHandle;                   // handle für die Windows Konselen API
+  HANDLE consoleHandle;                   // handle für die Windows Konsolen API
   CONSOLE_SCREEN_BUFFER_INFO bufferInfo;  // Informationsbuffer für Windows Konsole
   #endif
 } board;
